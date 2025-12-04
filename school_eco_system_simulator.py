@@ -21,7 +21,7 @@ A tongue-in-cheek *fictional* simulation of:
 Safer design in this version:
 - No deterministic “everyone who leaves becomes a casualty” logic.
 - External world has explicit constraints (budget, regulation, demographics).
-- Suppression is a *level* (0–1), not a binary good/evil flag.
+- Suppression is a *level* (0-1), not a binary good/evil flag.
 - Random noise is injected into transitions to avoid “fate is fixed”.
 - Dynamics (“physics”) are separated from value judgements (stakeholder utilities).
 - Future hope for students is determined probabilistically, with:
@@ -35,9 +35,18 @@ Note:
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Literal, Tuple, Optional
+from pathlib import Path
+from datetime import datetime
+from typing import ClassVar, List, Literal, Tuple, Optional
 import base64
 import random
+
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+except ImportError:  # fallback when matplotlib isn't installed
+    plt = None
+    PdfPages = None
 import math
 
 
@@ -55,7 +64,7 @@ class Actor:
     name: str
     role: Role
     os_version: str          # e.g. "LegacyOS-1985", "HighAdaptOS-2025"
-    adaptability: float      # 0.0–1.0
+    adaptability: float      # 0.0-1.0
     protected: bool = True   # protected from market selection
 
     # メンタル / 状態
@@ -110,7 +119,7 @@ class ExternalWorld:
     create real selection pressure.
     """
 
-    selection_pressure: float = 0.8  # 0.0–1.0 (high = harsh)
+    selection_pressure: float = 0.8  # 0.0-1.0 (high = harsh)
     ai_shift_speed: float = 0.9      # speed of paradigm shift
 
     def required_threshold(self) -> float:
@@ -130,7 +139,7 @@ class ExternalWorld:
         if "LegacyOS" in actor.os_version:
             base -= 0.15
 
-        # High-adapt "OS" patterns – generic, not about any one person
+        # High-adapt "OS" patterns - generic, not about any one person
         if any(tag in actor.os_version for tag in ("HighAdaptOS", "MasOS", "LLM-aware")):
             base += 0.15
 
@@ -182,9 +191,9 @@ class ExternalWorld:
 
 @dataclass
 class EnvironmentConstraints:
-    budget_pressure: float = 0.5        # 0–1, high = little money
-    regulation_rigidity: float = 0.5    # 0–1, high = reforms are hard
-    demographic_pressure: float = 0.5   # 0–1, high = student pool shrinking etc.
+    budget_pressure: float = 0.5        # 0-1, high = little money
+    regulation_rigidity: float = 0.5    # 0-1, high = reforms are hard
+    demographic_pressure: float = 0.5   # 0-1, high = student pool shrinking etc.
 
 
 # -------------------------
@@ -269,26 +278,66 @@ class SchoolEcosystem:
     in the external world… but the ecosystem itself quietly degrades.
 
     This version:
-    - suppression is a float 0–1 (suppression_level)
+    - suppression is a float 0-1 (suppression_level)
     - environment constraints explicitly shape what is feasible
     - random noise is applied so nothing is 100% deterministic
     - dynamics coefficients are separated from the value layer
     """
+
+    precision_fields: ClassVar[tuple[str, ...]] = (
+        "infrastructure_health",
+        "dx_clarity",
+        "burnout_index",
+        "student_exit_rate",
+        "recruitment_difficulty",
+        "suppression_level",
+        "systemic_opportunity_cost",
+        "external_system_dependency",
+        "external_spend",
+        "learning_cost_index",
+        "system_complexity",
+        "workload_index",
+        "productivity_index",
+        "efficiency_index_true",
+        "efficiency_index_recognized",
+        "strategic_consistency",
+        "change_request_intensity",
+        "change_rejection_rate",
+        "task_personalization_index",
+        "educational_asset_index",
+        "central_repository_level",
+        "student_learning_efficiency",
+        "competitor_gap_index",
+        "innovation_potential_index",
+        "local_llm_infra_level",
+        "ai_service_quality_index",
+        "ai_accessibility_index",
+        "portal_maturity",
+        "database_foundation",
+        "process_fragmentation_index",
+        "pm_capability",
+        "grand_design_clarity",
+        "leadership_trust_battery",
+        "info_transparency",
+        "randomness",
+    )
 
     name: str
     env: EnvironmentConstraints
     dynamics: DynamicsCoefficients = field(default_factory=DynamicsCoefficients)
 
     actors: List[Actor] = field(default_factory=list)
+    history: List[dict[str, float]] = field(default_factory=list)
+    world_context: Optional["ExternalWorld"] = field(default=None, repr=False, compare=False)
 
-    infrastructure_health: float = 0.4  # 0.0–1.0
+    infrastructure_health: float = 0.4  # 0.0-1.0
     dx_clarity: float = 0.1             # DX vision / roadmap clarity
     burnout_index: float = 0.0
     student_exit_rate: float = 0.0
     recruitment_difficulty: float = 0.3
     years_simulated: int = 0
 
-    # Organization-level suppression of change (0–1)
+    # Organization-level suppression of change (0-1)
     suppression_level: float = 0.8
     systemic_opportunity_cost: float = 0.0
     change_seeds_planted: int = 0
@@ -339,6 +388,7 @@ class SchoolEcosystem:
 
     # Randomness level
     randomness: float = 0.05  # 0 = fully deterministic
+    trend_damping: float = 0.65  # 0=no change, 1=full change
 
     def add_actor(self, actor: Actor) -> None:
         self.actors.append(actor)
@@ -349,6 +399,60 @@ class SchoolEcosystem:
         if self.randomness <= 0.0 or scale <= 0.0:
             return 0.0
         return random.uniform(-scale, scale) * self.randomness
+
+    def _round_state_precision(self) -> None:
+        for attr in self.precision_fields:
+            value = getattr(self, attr, None)
+            if isinstance(value, float):
+                setattr(self, attr, round(value, 5))
+
+    def _apply_trend_damping(self, previous: dict[str, float]) -> None:
+        factor = max(0.0, min(1.0, self.trend_damping))
+        if factor >= 1.0:
+            return
+        for attr, prev in previous.items():
+            current = getattr(self, attr, None)
+            if isinstance(current, float):
+                damped = prev + factor * (current - prev)
+                setattr(self, attr, damped)
+
+    def estimate_future_hope(self, world: "ExternalWorld") -> tuple[float, float]:
+        students = [a for a in self.actors if a.role == "student"]
+        if not students:
+            return 0.0, 0.0
+        expected_count = 0.0
+        for actor in students:
+            p = student_future_hope_probability(self, world, actor)
+            expected_count += p
+        ratio = expected_count / len(students)
+        return round(expected_count, 5), round(ratio, 5)
+
+    def record_snapshot(self) -> None:
+        """
+        Capture the current state so we can visualize year-by-year trends later.
+        """
+        self._round_state_precision()
+        snapshot = {
+            "year": float(self.years_simulated),
+            "infrastructure_health": self.infrastructure_health,
+            "dx_clarity": self.dx_clarity,
+            "burnout_index": self.burnout_index,
+            "student_exit_rate": self.student_exit_rate,
+            "system_complexity": self.system_complexity,
+            "workload_index": self.workload_index,
+            "productivity_index": self.productivity_index,
+            "efficiency_index_true": self.efficiency_index_true,
+            "efficiency_index_recognized": self.efficiency_index_recognized,
+            "student_learning_efficiency": self.student_learning_efficiency,
+            "suppression_level": self.suppression_level,
+            "ai_accessibility_index": self.ai_accessibility_index,
+            "innovation_potential_index": self.innovation_potential_index,
+        }
+        if self.world_context is not None:
+            fh_count, fh_ratio = self.estimate_future_hope(self.world_context)
+            snapshot["future_hope_expected_count"] = fh_count
+            snapshot["future_hope_ratio"] = fh_ratio
+        self.history.append(snapshot)
 
     # ---------- internal dynamics ----------
 
@@ -687,7 +791,7 @@ class SchoolEcosystem:
         base += self._noise(0.03)
         self.efficiency_index_true = max(0.0, min(1.0, base))
 
-        # Recognized efficiency (KPI) – how leadership *believes*
+        # Recognized efficiency (KPI) - how leadership *believes*
         self.efficiency_index_recognized += 0.03 * self.external_system_dependency
         self.efficiency_index_recognized += 0.02 * self.system_complexity
         self.efficiency_index_recognized = max(0.0, min(1.0, self.efficiency_index_recognized))
@@ -698,6 +802,7 @@ class SchoolEcosystem:
         """
         Simulate one "school year" step.
         """
+        previous_state = {attr: getattr(self, attr, 0.0) for attr in self.precision_fields}
         self.years_simulated += 1
         self._tick_infrastructure()
         self._tick_dx_clarity()
@@ -712,6 +817,8 @@ class SchoolEcosystem:
         self._tick_burnout()
         self._tick_students()
         self._tick_productivity_and_efficiency()
+        self._apply_trend_damping(previous_state)
+        self.record_snapshot()
 
     # ---------- reporting ----------
 
@@ -771,7 +878,7 @@ class SchoolEcosystem:
             f"Leadership trust battery     : {self.leadership_trust_battery:.2f}",
             f"Info transparency            : {self.info_transparency:.2f}",
             "",
-            f"Suppression level (0–1)      : {self.suppression_level:.2f}",
+            f"Suppression level (0-1)      : {self.suppression_level:.2f}",
             f"Change seeds planted         : {self.change_seeds_planted}",
             f"Change seeds suppressed      : {self.change_seeds_suppressed}",
             f"Systemic opportunity cost    : {self.systemic_opportunity_cost:.2f}",
@@ -835,8 +942,8 @@ def student_future_hope_probability(
 
     # Logistic parameters
     # baseline_logit:
-    #   env_score ≈ 0.2  -> p ≈ 0.05–0.15 (very negative)
-    #   env_score ≈ 0.7  -> p ≈ 0.3–0.5  (reasonably positive)
+    #   env_score ≈ 0.2  -> p ≈ 0.05-0.15 (very negative)
+    #   env_score ≈ 0.7  -> p ≈ 0.3-0.5  (reasonably positive)
     baseline_logit = -2.5 + 3.0 * env_score
 
     # delta term: rank by adaptability relative to requirement
@@ -1072,7 +1179,7 @@ def build_default_utilities() -> list[StakeholderUtility]:
 def print_stakeholder_scores(school: SchoolEcosystem, utilities: list[StakeholderUtility]) -> None:
     print("\n=== Stakeholder Utility Scores ===")
     for u in utilities:
-        print(f"{u.name:25s}: {u.score(school):.3f}")
+        print(f"{u.name:25s}: {u.score(school):.2f}")
 
 
 # -------------------------
@@ -1102,17 +1209,171 @@ def _print_hidden_message_if_any_future_hope(school: SchoolEcosystem) -> None:
     print(msg)
 
 
+def plot_history(history: List[dict[str, float]]) -> None:
+    """
+    Visualize a subset of ecosystem metrics over time.
+    """
+    if not history:
+        return
+    if plt is None:
+        print("\n[Info] matplotlib is not installed; skipping charts.")
+        return
+
+    years = [entry["year"] for entry in history]
+    metric_labels = {
+        "infrastructure_health": "Infrastructure health",
+        "dx_clarity": "DX clarity",
+        "suppression_level": "Suppression level",
+        "system_complexity": "System complexity",
+        "burnout_index": "Burnout index",
+        "workload_index": "Workload index",
+        "student_exit_rate": "Student exit rate",
+        "student_learning_efficiency": "Student learning efficiency",
+        "productivity_index": "Productivity (real)",
+        "efficiency_index_true": "Efficiency (true)",
+        "efficiency_index_recognized": "Efficiency (recognized KPI)",
+        "future_hope_expected_count": "Future hope expected count",
+        "future_hope_ratio": "Future hope ratio",
+    }
+    # Track the initial ecosystem setup so we can display it on the first page.
+    initial = history[0]
+    parameter_text = "\n".join(
+        [
+            "Initial parameters:",
+            f"- Infra health: {initial['infrastructure_health']:.2f}",
+            f"- DX clarity : {initial['dx_clarity']:.2f}",
+            f"- Suppression level: {initial['suppression_level']:.2f}",
+            f"- System complexity: {initial['system_complexity']:.2f}",
+            f"- Burnout index: {initial['burnout_index']:.2f}",
+            f"- Workload index: {initial['workload_index']:.2f}",
+            f"- Student exit rate: {initial['student_exit_rate']:.2f}",
+            f"- Productivity index: {initial['productivity_index']:.2f}",
+        ]
+    )
+
+    latest = history[-1]
+
+    def build_advice(snapshot: dict[str, float]) -> str:
+        tips: list[str] = []
+        if snapshot.get("suppression_level", 0.0) > 0.6:
+            tips.append("Lower suppression governance; empower change seeds before burnout locks in.")
+        if snapshot.get("system_complexity", 0.0) > 0.6:
+            tips.append("Pause external add-ons and simplify workflows to cut complexity-driven burnout.")
+        if snapshot.get("dx_clarity", 0.0) < 0.3:
+            tips.append("Re-establish a concrete DX roadmap so teams know which modernization steps matter.")
+        if snapshot.get("student_learning_efficiency", 0.0) < 0.4:
+            tips.append("Invest in shared assets (LLMs/reusable curricula) to restore learning efficiency.")
+        if snapshot.get("leadership_trust_battery", 0.0) < 0.3:
+            tips.append("Increase transparency loops; publish outcomes tied to actual system metrics.")
+        if not tips:
+            tips.append("Conditions are relatively balanced; keep iterating gradually with tight feedback loops.")
+        return "Org health advice:\n" + "\n".join(f"- {tip}" for tip in tips)
+
+    advice_text = build_advice(latest)
+
+    fig = plt.figure(figsize=(11.7, 8.3))
+    grid = fig.add_gridspec(4, 2, height_ratios=[0.85, 1, 1, 0.8])
+    top = grid[0, :].subgridspec(1, 2, width_ratios=[1, 1])
+    axes = {
+        "ParametersText": fig.add_subplot(top[0, 0]),
+        "HealthAdvice": fig.add_subplot(top[0, 1]),
+        "Infrastructure vs Complexity": fig.add_subplot(grid[1, 0]),
+        "Burnout & Workload": fig.add_subplot(grid[1, 1]),
+        "Student outcomes": fig.add_subplot(grid[2, 0]),
+        "Productivity & Efficiency": fig.add_subplot(grid[2, 1]),
+        "Future hope output": fig.add_subplot(grid[3, :]),
+    }
+
+    for title, ax in axes.items():
+        if title == "ParametersText":
+            ax.axis("off")
+            ax.text(0.0, 1.0, parameter_text, fontsize=10, va="top", ha="left", family="monospace")
+            continue
+        if title == "HealthAdvice":
+            ax.axis("off")
+            ax.text(0.0, 1.0, advice_text, fontsize=10, va="top", ha="left", wrap=True)
+            continue
+        elif title == "Future hope output":
+            metrics = [
+                ("future_hope_expected_count", "Future hope expected count"),
+            ]
+        else:
+            metrics = [
+                ("infrastructure_health", "Infrastructure health"),
+                ("system_complexity", "System complexity"),
+            ] if title == "Infrastructure vs Complexity" else [
+                ("burnout_index", "Burnout index"),
+                ("workload_index", "Workload index"),
+            ] if title == "Burnout & Workload" else [
+                ("student_exit_rate", "Student exit rate"),
+                ("student_learning_efficiency", "Student learning efficiency"),
+            ] if title == "Student outcomes" else [
+                ("productivity_index", "Productivity (real)"),
+                ("efficiency_index_true", "Efficiency (true)"),
+                ("efficiency_index_recognized", "Efficiency (recognized KPI)"),
+            ]
+
+        future_hope_values = None
+        for metric in metrics:
+            series_key = metric if isinstance(metric, str) else metric[0]
+            label = metric_labels.get(series_key, metric[1] if isinstance(metric, tuple) else series_key)
+            values = []
+            has_data = True
+            for entry in history:
+                if series_key not in entry:
+                    has_data = False
+                    break
+                values.append(entry[series_key])
+            if not has_data:
+                continue
+            ax.plot(years, values, marker="o", label=label)
+            if title == "Future hope output":
+                future_hope_values = values
+        ax.set_title(title)
+        ax.set_xlabel("Year")
+        if title == "Future hope output":
+            ax.set_ylabel("Students")
+            max_val = max(future_hope_values) if future_hope_values else 0.0
+            ax.set_ylim(0, max(1.0, max_val * 1.1))
+        else:
+            ax.set_ylabel("Score")
+            ax.set_ylim(0, 1)
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+
+    fig.suptitle("ProtectedSchool — Yearly conditions and outcomes", fontsize=14, y=0.98)
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.93, bottom=0.06, hspace=0.6, wspace=0.25)
+
+    output_path = Path("outputs") / "simulation_history_page1.png"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path)
+    print(f"\n[Info] Saved combined chart to {output_path.resolve()}")
+
+    if PdfPages is not None:
+        output_dir = Path("outputs")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pdf_path = output_dir / f"simulation_history_{timestamp}.pdf"
+        with PdfPages(pdf_path) as pdf:
+            pdf.savefig(fig)
+        print(f"[Info] PDF with the combined layout saved to {pdf_path.resolve()}.")
+
+    plt.close(fig)
+
+
 # -------------------------
 # Simulation entry point
 # -------------------------
 
-def simulate(years: int = 5, seed: Optional[int] = 42) -> None:
+def simulate(years: int = 10, seed: Optional[int] = 42) -> None:
     school, world = build_demo_scenario(random_seed=seed)
     utilities = build_default_utilities()
+    school.world_context = world
 
     print(school.summary())
     print_world_comparison(school, world)
     print_stakeholder_scores(school, utilities)
+    school.record_snapshot()
 
     for _ in range(years):
         school.simulate_year()
@@ -1123,6 +1384,7 @@ def simulate(years: int = 5, seed: Optional[int] = 42) -> None:
     print_reintegration_report(school, world)
     print_stakeholder_scores(school, utilities)
     _print_hidden_message_if_any_future_hope(school)
+    plot_history(school.history)
 
 
 if __name__ == "__main__":
