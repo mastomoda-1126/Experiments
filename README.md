@@ -1,7 +1,7 @@
 # School Ecosystem Simulator
 
 ## What This Script Does
-- Models a fictional “protected Eschool ecosystem interacting with a harsher external world that is shaped by AI/DX trends.
+- Models a fictional “protected school ecosystem interacting with a harsher external world that is shaped by AI/DX trends.
 - Simulates infrastructure decay, burnout, productivity, efficiency, and stakeholder utilities with explicit randomness so results are non-deterministic.
 - Tracks legacy staff, higher-adaptability teachers, and 100 generated students to see who burns out, leaves, or becomes “future hope Eafter a multiyear run.
 - Prints summaries before and after the run, compares staff against external requirements, reports student futures, and emits a lightly obfuscated hidden message if any students reach future-hope status.
