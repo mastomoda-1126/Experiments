@@ -11,6 +11,13 @@ A small **fictional systems-toy** that models a “protected” school ecosystem
 
 ---
 
+## Version
+
+- Current version: **1.0.1** (defined in `main.py::__version__`)
+- When bumping the version, update both `main.py` and this README section to keep them aligned.
+
+---
+
 ## 1. What This Script Does
 
 At a high level, the simulator:
@@ -123,6 +130,11 @@ Each `Actor` represents one person in the ecosystem:
   * whether they rebooted successfully outside or became a casualty
   * opportunity cost and what choice they made (`stay_inside` / `leave_outside`)
   * for students: probability and label of “future hope”.
+
+To keep scenario definitions readable, two helper dataclasses wrap these parameters:
+
+* `ActorSpec` – deterministic staff/admin entries instantiated via `_add_actor_specs`.
+* `StudentDemographic` – cohort definitions (count, adaptability distribution, attitude probabilities) used by `_populate_student_demographics` to create 100 diverse students.
 
 ### 3.2 ExternalWorld
 
@@ -388,43 +400,22 @@ Use this to encode **different hypotheses**:
 
 ### 4.6 Actors (staff & students)
 
-At the end of `build_demo_scenario()`:
+`build_demo_scenario()` now separates deterministic adults and demographic-driven students:
 
-* A small set of admins / teachers is created:
+1. **Staff/Admins (20 total)** – encoded as `core_actor_specs` (list of `ActorSpec`). This covers legacy leadership, hybrid ops, wellness roles, multiple high-adapt teachers, outreach coaches, etc. `_add_actor_specs()` simply iterates that list and instantiates each entry, so editing the staff cast is as easy as changing the table.
+2. **Students (100 total)** – defined through `student_demographics`, a list of nine `StudentDemographic` cohorts (UrbanScholar, RuralGeneral, STEMCoder, CreativeArtist, TransferStudent, CaregiverWorker, Athlete, Activist, InternationalBridge). Each cohort declares its count, OS tag, adaptability mean/std (clamped to `[0.1, 0.95]`), protection flag, and support/neutral/resist probabilities. `_populate_student_demographics()` handles naming and sampling accordingly.
 
-  * legacy DX chief
-  * legacy teachers
-  * several high-adapt teachers (generic “test particles”)
-* Then 100 students are added:
+To customize:
 
-```python
-for i in range(100):
-    adapt = random.gauss(0.5, 0.15)
-    adapt = max(0.1, min(0.9, adapt))
-    ...
-```
+* Modify entries in `core_actor_specs` to add/remove specific adults or tweak their adaptability/protection.
+* Adjust cohort sizes or distributions inside `student_demographics` to reflect different fictional demographics or total student counts.
+* Introduce new cohorts (e.g., `EveningAdultLearner`, `ExchangeScholar`) by appending to the demographic list.
 
-You can:
-
-* Change the **number** of students.
-* Change the adaptability distribution:
-
-  * mean (`0.5`) → more adaptive or more fragile cohorts.
-  * standard deviation (`0.15`) → more homogeneous vs more diverse.
-  * clamp range (`[0.1, 0.9]`) → minimum and maximum adaptability.
-* Change `change_attitude` probabilities (support / neutral / resist).
-* Add or remove teachers / admins with different:
-
-  * `os_version`
-  * `adaptability`
-  * `change_attitude`
-  * `protected` flag
-
-These changes will affect:
+These edits continue to influence:
 
 * How many “change seeds” exist (`_tick_change_dynamics`).
-* Who burns out and who leaves under pressure.
-* How external survival checks play out.
+* Burnout/exit patterns among adults.
+* Student future-hope probabilities, since adaptability and environment interplay in `student_future_hope_probability()`.
 
 ### 4.7 Stakeholder utilities (value perspectives)
 
@@ -581,6 +572,8 @@ The important part is not the exact numbers, but **the conversations and questio
 
 # Japanese ver.
 
+**バージョン**: 現在のバージョンは **1.0.1** です（`main.py` の `__version__` と同じ値）。バージョンを上げる際は `main.py` と README の両方を同時に更新してください。
+
 ````markdown
 # School Ecosystem Simulator（スクール・エコシステム・シミュレータ）
 
@@ -710,6 +703,11 @@ class Actor:
   * 外部で「再起」できたか、それとも「犠牲」になったか
   * 機会費用（opportunity_cost）と、そのときの選択（`stay_inside` / `leave_outside`）
   * 生徒の場合：future hope 確率とラベル
+
+シナリオ定義を読みやすく保つため、次の補助 dataclass を併用しています：
+
+* `ActorSpec` – `_add_actor_specs` を通じて個別ポジションを生成する人材テーブルです。
+* `StudentDemographic` – `_populate_student_demographics` で定義個数の生徒を指定分布に応じて自動生成するためのコーホートです。
 
 ### 3.2 ExternalWorld
 
@@ -1000,39 +998,22 @@ school = SchoolEcosystem(
 
 ### 4.6 アクター（教職員・生徒）
 
-`build_demo_scenario()` の末尾近くで、アクターが追加されています。
+`build_demo_scenario()` では、次の 2 テーブルで初期アクターを管理しています。
 
-* 管理職 / 教員：
+1. **教員・管理職 20 名**  E `ActorSpec` のリスト `core_actor_specs` に定義。レガシー系リーダー、ハイブリッド運営、ウェルネス担当、高適応教員、地域連携コーチなどを含みます。`_add_actor_specs()` がこの表をそのまま `Actor` に変換するため、キャストの調整はテーブル編集だけで済みます。
+2. **生徒 100 名**  E `StudentDemographic` のリスト `student_demographics` で 9 コーホート（UrbanScholar / RuralGeneral / STEMCoder / CreativeArtist / TransferStudent / CaregiverWorker / Athlete / Activist / InternationalBridge）を定義。各コーホートが人数・OS・適応度平均/標準偏差（`[0.1, 0.95]` に clamp）・保護有無・態度確率を持ち、`_populate_student_demographics()` が命名と確率サンプリングを行います。
 
-  * レガシーDX担当、レガシー教員数名
-  * 高適応教員（`HighAdaptTeacher1`〜`3`）…特定の誰かではなく、**テスト用の抽象粒子**
-* 生徒（100名）：
+カスタマイズの例：
 
-```python
-for i in range(100):
-    adapt = random.gauss(0.5, 0.15)
-    adapt = max(0.1, min(0.9, adapt))
-    ...
-```
+* `core_actor_specs` の行を編集して、特定ポジションを追加・削除したり適応度/保護設定を変える。
+* `student_demographics` 内の人数や分布を変え、別のフィクション上の人口配分を表現する。
+* 新しいコーホート（例：`EveningAdultLearner`, `ExchangeScholar` など）を追加して構成比を調整する。
 
-変更できるポイント：
+これらの変更は引き続き、
 
-* 生徒数を増減させる
-* 適応力分布を変更
-
-  * 平均値（`0.5`）を上げれば「全体的にハイスペックな学年」
-  * 標準偏差（`0.15`）を変えれば「凸凹の大きい学年」など
-  * clamp 範囲（`[0.1, 0.9]`）を変えれば最低・最高の適応力
-* `change_attitude` の分布（support / neutral / resist の比率）
-* 教員・管理職の追加／削除
-
-  * `os_version`, `adaptability`, `change_attitude`, `protected` などを調整
-
-これらは：
-
-* どれだけ「変化の種」が存在するか（`_tick_change_dynamics`）
-* 誰がバーンアウトし、誰が離脱しやすいか
-* 外部世界でのサバイバルチェック
+* 「変化の種」量（`_tick_change_dynamics`）
+* 教員側のバーンアウト／離脱パターン
+* `student_future_hope_probability()` による future hope 確率
 
 などに影響します。
 
