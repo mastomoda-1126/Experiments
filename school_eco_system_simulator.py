@@ -34,7 +34,7 @@ Note:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from datetime import datetime
 from typing import ClassVar, List, Literal, Tuple, Optional
@@ -49,6 +49,7 @@ except ImportError:  # fallback when matplotlib isn't installed
     PdfPages = None
 import math
 
+__version__ = "1.0.1"
 
 Role = Literal["teacher", "admin", "student"]
 OpportunityChoice = Literal["none", "stay_inside", "leave_outside"]
@@ -108,6 +109,41 @@ class Actor:
         )
 
 
+@dataclass(frozen=True)
+class ActorSpec:
+    """Simple container for deterministic actor setup."""
+
+    name: str
+    role: Role
+    os_version: str
+    adaptability: float
+    protected: bool
+    change_attitude: ChangeAttitude
+
+
+@dataclass(frozen=True)
+class StudentDemographic:
+    """Definition for a cohort of students that share similar attributes."""
+
+    label: str
+    count: int
+    os_version: str
+    adapt_mean: float
+    adapt_std: float
+    protected: bool
+    attitude_probs: dict[ChangeAttitude, float]
+
+    def sample_attitude(self) -> ChangeAttitude:
+        """Sample change attitude based on configured probabilities."""
+        r = random.random()
+        support = self.attitude_probs.get("support", 0.0)
+        neutral = self.attitude_probs.get("neutral", 0.0)
+        if r < support:
+            return "support"
+        if r < support + neutral:
+            return "neutral"
+        return "resist"
+
 # -------------------------
 # External world
 # -------------------------
@@ -140,7 +176,7 @@ class ExternalWorld:
             base -= 0.15
 
         # High-adapt "OS" patterns - generic, not about any one person
-        if any(tag in actor.os_version for tag in ("HighAdaptOS", "MasOS", "LLM-aware")):
+        if any(tag in actor.os_version for tag in ("HighAdaptOS", "StandardOS", "LLM-aware")):
             base += 0.15
 
         # Change attitude has a modest effect
@@ -955,6 +991,43 @@ def student_future_hope_probability(
 
 
 # -------------------------
+# Demo setup helpers
+# -------------------------
+
+def _add_actor_specs(school: SchoolEcosystem, specs: list[ActorSpec]) -> None:
+    """Instantiate deterministic actors from ActorSpec entries."""
+    for spec in specs:
+        school.add_actor(Actor(**asdict(spec)))
+
+
+def _clamped_gauss(mean: float, std: float, lo: float = 0.1, hi: float = 0.95) -> float:
+    """Gaussian draw that stays within [lo, hi]."""
+    value = random.gauss(mean, std)
+    return max(lo, min(hi, value))
+
+
+def _populate_student_demographics(
+    school: SchoolEcosystem, demographics: list[StudentDemographic]
+) -> None:
+    """Create student actors via demographic definitions."""
+    label_counters: dict[str, int] = {demo.label: 0 for demo in demographics}
+    for demo in demographics:
+        for _ in range(demo.count):
+            label_counters[demo.label] += 1
+            adaptability = _clamped_gauss(demo.adapt_mean, demo.adapt_std)
+            school.add_actor(
+                Actor(
+                    name=f"{demo.label}Student{label_counters[demo.label]}",
+                    role="student",
+                    os_version=demo.os_version,
+                    adaptability=adaptability,
+                    protected=demo.protected,
+                    change_attitude=demo.sample_attitude(),
+                )
+            )
+
+
+# -------------------------
 # Demo setup & helpers
 # -------------------------
 
@@ -982,95 +1055,254 @@ def build_demo_scenario(random_seed: Optional[int] = None) -> Tuple[SchoolEcosys
         env=env,
     )
 
-    # Legacy admin / teachers
-    school.add_actor(
-        Actor(
+    core_actor_specs = [
+        ActorSpec(
             name="LegacyDXChief",
             role="admin",
             os_version="LegacyOS-1995",
             adaptability=0.3,
             protected=True,
             change_attitude="neutral",
-        )
-    )
-    school.add_actor(
-        Actor(
+        ),
+        ActorSpec(
             name="LegacyTeacherA",
             role="teacher",
             os_version="LegacyOS-2000",
             adaptability=0.4,
             protected=True,
             change_attitude="support",
-        )
-    )
-    school.add_actor(
-        Actor(
+        ),
+        ActorSpec(
             name="LegacyTeacherB",
             role="teacher",
             os_version="LegacyOS-2005",
             adaptability=0.35,
             protected=True,
             change_attitude="resist",
-        )
-    )
-
-    # 高適応の教員たち（ヒーローではなく、ただのサンプル粒子）
-    school.add_actor(
-        Actor(
+        ),
+        ActorSpec(
+            name="NightSchoolCoordinator",
+            role="admin",
+            os_version="LegacyOS-1990",
+            adaptability=0.32,
+            protected=True,
+            change_attitude="resist",
+        ),
+        ActorSpec(
+            name="OperationsAnalyst",
+            role="admin",
+            os_version="HybridOS-2018",
+            adaptability=0.65,
+            protected=False,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="WellnessCounselor",
+            role="admin",
+            os_version="CareOS-2019",
+            adaptability=0.58,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
             name="HighAdaptTeacher1",
             role="teacher",
             os_version="HighAdaptOS-2025 (LLM-aware)",
             adaptability=0.9,
             protected=False,
             change_attitude="support",
-        )
-    )
-    school.add_actor(
-        Actor(
+        ),
+        ActorSpec(
             name="HighAdaptTeacher2",
             role="teacher",
             os_version="HighAdaptOS-2022",
             adaptability=0.8,
             protected=False,
             change_attitude="support",
-        )
-    )
-    school.add_actor(
-        Actor(
+        ),
+        ActorSpec(
             name="HighAdaptTeacher3",
             role="teacher",
             os_version="HighAdaptOS-2020",
             adaptability=0.75,
             protected=True,
             change_attitude="neutral",
-        )
-    )
+        ),
+        ActorSpec(
+            name="CommunityMentor",
+            role="teacher",
+            os_version="LegacyOS-2010",
+            adaptability=0.55,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="DataAdjunct",
+            role="teacher",
+            os_version="LocalOS-2024",
+            adaptability=0.7,
+            protected=False,
+            change_attitude="neutral",
+        ),
+        ActorSpec(
+            name="FieldResearchTutor",
+            role="teacher",
+            os_version="HybridOS-2016",
+            adaptability=0.62,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="AthleticsLead",
+            role="teacher",
+            os_version="HybridOS-2015",
+            adaptability=0.6,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="AfterSchoolCoderCoach",
+            role="teacher",
+            os_version="HighAdaptOS-2021",
+            adaptability=0.68,
+            protected=False,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="ArtistInResidence",
+            role="teacher",
+            os_version="CreativeOS-2018",
+            adaptability=0.57,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="TransferCoordinator",
+            role="admin",
+            os_version="OpsOS-2012",
+            adaptability=0.52,
+            protected=True,
+            change_attitude="neutral",
+        ),
+        ActorSpec(
+            name="ScholarshipAdvisor",
+            role="admin",
+            os_version="FinanceOS-2016",
+            adaptability=0.5,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="FamilyLiaison",
+            role="admin",
+            os_version="CareOS-2015",
+            adaptability=0.48,
+            protected=True,
+            change_attitude="neutral",
+        ),
+        ActorSpec(
+            name="CivicProgramLead",
+            role="teacher",
+            os_version="HybridOS-2014",
+            adaptability=0.6,
+            protected=True,
+            change_attitude="support",
+        ),
+        ActorSpec(
+            name="RuralOutreachCoach",
+            role="teacher",
+            os_version="LegacyOS-2012",
+            adaptability=0.45,
+            protected=True,
+            change_attitude="support",
+        ),
+    ]
+    _add_actor_specs(school, core_actor_specs)
 
-    # 100名の学生を追加（適応度は分布を持たせる）
-    for i in range(100):
-        # おおよそ平均0.5、標準偏差0.15くらいの分布（0.1〜0.9にクリップ）
-        adapt = random.gauss(0.5, 0.15)
-        adapt = max(0.1, min(0.9, adapt))
-
-        # 態度はほとんどがneutral、一部support/resist
-        r = random.random()
-        if r < 0.15:
-            att = "support"
-        elif r > 0.85:
-            att = "resist"
-        else:
-            att = "neutral"
-
-        school.add_actor(
-            Actor(
-                name=f"Student{i+1}",
-                role="student",
-                os_version="StudentOS-1.0",
-                adaptability=adapt,
-                protected=True,
-                change_attitude=att,  # mostly neutral
-            )
-        )
+    student_demographics = [
+        StudentDemographic(
+            label="UrbanScholar",
+            count=25,
+            os_version="StudentOS-1.3",
+            adapt_mean=0.58,
+            adapt_std=0.12,
+            protected=True,
+            attitude_probs={"support": 0.3, "neutral": 0.55, "resist": 0.15},
+        ),
+        StudentDemographic(
+            label="RuralGeneral",
+            count=15,
+            os_version="StudentOS-0.95",
+            adapt_mean=0.45,
+            adapt_std=0.1,
+            protected=True,
+            attitude_probs={"support": 0.15, "neutral": 0.65, "resist": 0.2},
+        ),
+        StudentDemographic(
+            label="STEMCoder",
+            count=10,
+            os_version="LLM-aware StudentOS-2025",
+            adapt_mean=0.78,
+            adapt_std=0.08,
+            protected=False,
+            attitude_probs={"support": 0.55, "neutral": 0.4, "resist": 0.05},
+        ),
+        StudentDemographic(
+            label="CreativeArtist",
+            count=10,
+            os_version="StudentOS-1.1",
+            adapt_mean=0.52,
+            adapt_std=0.1,
+            protected=True,
+            attitude_probs={"support": 0.25, "neutral": 0.6, "resist": 0.15},
+        ),
+        StudentDemographic(
+            label="TransferStudent",
+            count=10,
+            os_version="StudentOS-1.0",
+            adapt_mean=0.48,
+            adapt_std=0.12,
+            protected=True,
+            attitude_probs={"support": 0.2, "neutral": 0.5, "resist": 0.3},
+        ),
+        StudentDemographic(
+            label="CaregiverWorker",
+            count=10,
+            os_version="StudentOS-0.9",
+            adapt_mean=0.4,
+            adapt_std=0.1,
+            protected=True,
+            attitude_probs={"support": 0.1, "neutral": 0.55, "resist": 0.35},
+        ),
+        StudentDemographic(
+            label="Athlete",
+            count=10,
+            os_version="StudentOS-1.2",
+            adapt_mean=0.5,
+            adapt_std=0.1,
+            protected=True,
+            attitude_probs={"support": 0.35, "neutral": 0.5, "resist": 0.15},
+        ),
+        StudentDemographic(
+            label="Activist",
+            count=5,
+            os_version="StudentOS-1.15",
+            adapt_mean=0.6,
+            adapt_std=0.1,
+            protected=True,
+            attitude_probs={"support": 0.6, "neutral": 0.25, "resist": 0.15},
+        ),
+        StudentDemographic(
+            label="InternationalBridge",
+            count=5,
+            os_version="StudentOS-Intl-1.4",
+            adapt_mean=0.66,
+            adapt_std=0.09,
+            protected=False,
+            attitude_probs={"support": 0.45, "neutral": 0.45, "resist": 0.1},
+        ),
+    ]
+    _populate_student_demographics(school, student_demographics)
 
     return school, world
 
@@ -1208,10 +1440,13 @@ def _print_hidden_message_if_any_future_hope(school: SchoolEcosystem) -> None:
     print("\n=== Hidden message ===")
     print(msg)
 
-
 def plot_history(history: List[dict[str, float]]) -> None:
     """
     Visualize a subset of ecosystem metrics over time.
+
+    NOTE TO CODE AGENTS:
+    The output directory is intentionally fixed to `school_eco_system_simulator/outputs/`.
+    Do not change the destination unless specifically instructed by the user.
     """
     if not history:
         return
@@ -1344,13 +1579,13 @@ def plot_history(history: List[dict[str, float]]) -> None:
     fig.suptitle("ProtectedSchool — Yearly conditions and outcomes", fontsize=14, y=0.98)
     fig.subplots_adjust(left=0.07, right=0.97, top=0.93, bottom=0.06, hspace=0.6, wspace=0.25)
 
-    output_path = Path("outputs") / "simulation_history_page1.png"
+    output_dir = Path(__file__).resolve().parent / "outputs"
+    output_path = output_dir / "simulation_history_page1.png"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path)
     print(f"\n[Info] Saved combined chart to {output_path.resolve()}")
 
     if PdfPages is not None:
-        output_dir = Path("outputs")
         output_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         pdf_path = output_dir / f"simulation_history_{timestamp}.pdf"
