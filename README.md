@@ -1,13 +1,20 @@
 ````markdown
 # School Ecosystem Simulator
 
-A small **fictional systems-toy** that models a “protected” school ecosystem interacting with a stricter external world shaped by AI / DX / macro changes.
+A small **fictional systems-toy** that models a “protected” school ecosystem and a stricter external world shaped by AI / DX / macro changes. It is meant for **thought experiments and discussion**, not for prediction.
 
-> ⚠️ **Important upfront notes**
->
-> - All schools, people, and roles in this simulator are **fictional**.
-> - All numbers (coefficients, thresholds, probabilities) are **illustrative levers**, not empirical truth.
-> - This is **not** a decision-support tool for real HR or policy. It is a **thought experiment** about structure, pressure, and different stakeholder perspectives.
+ ⚠️ **Important upfront notes**
+
+ - All schools, people, and roles in this simulator are **fictional**.
+ - All numbers (coefficients, thresholds, probabilities) are **illustrative levers**, not empirical truth.
+ - This is **not** a decision-support tool for real HR, policy, or clinical decisions.
+ - The update rules are **loosely informed by recent research** (e.g. on job demands–resources, school climate, technostress, AI in education), but only at the level of *directions* (signs), not effect sizes.
+ - AI / LLM tools in this script are intentionally simplified:
+   - They relieve some workload and improve learning efficiency **only after** certain structural pre-conditions (infrastructure, repositories, clarity, trust) are met.
+   - Real-world AI deployments can also *increase* workload and stress; those “AI gone wrong” scenarios are largely **out of scope** for this toy model.
+
+ In short: this code is a **sandbox for exploring assumptions** about structure, pressure, and different stakeholder perspectives – not a model of any specific real institution.
+
 
 ---
 
@@ -39,7 +46,7 @@ At a high level, the simulator:
 - Tracks:
   - legacy admins / teachers
   - several high-adaptability teachers
-  - 100 procedurally generated students
+  - a cohort of procedurally generated students
 - Observes over multiple years:
   - Who burns out?
   - Who leaves the system?
@@ -51,11 +58,14 @@ At the end of a run it:
 - Prints **before/after summaries** of the school state.
 - Compares staff against external survival thresholds.
 - Prints **reintegration outcomes** for staff who left.
-- Computes **probabilistic future hope** for each student.
+- Computes **probabilistic future hope** for each student (using a small logistic model based on adaptability and environment; this is *illustrative*, not predictive).
 - Prints **stakeholder utility scores** from several example viewpoints.
 - Emits a small, lightly obfuscated **hidden message** if at least one student is tagged as “future hope”.
 - Writes a **year-by-year history** (burnout, complexity, expected future-hope count, etc.) used for downstream reporting.
-- Generates a **dashboard PNG** plus a timestamped PDF under `outputs/` with trend charts and an automatically generated “Org health advice” panel.
+- Generates a **dashboard PNG** plus a timestamped PDF under `output/`, with simple charts and an automatically generated “Org health advice” panel.
+
+The intent is to give you a **playground for assumptions**: you tweak parameters and structures, then watch how the fictional ecosystem responds, knowing that the numbers are illustrative rather than empirically calibrated.
+
 
 ---
 
