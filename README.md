@@ -1,20 +1,28 @@
-````markdown
+`markdown
 # School Ecosystem Simulator
 
 A small **fictional systems-toy** that models a “protected” school ecosystem and a stricter external world shaped by AI / DX / macro changes. It is meant for **thought experiments and discussion**, not for prediction.
+日本語：AI・DX・マクロ環境の変化が強い外部世界と、そこからある程度守られた架空の学校エコシステムをシミュレートする**思考実験用の小さなモデル**です。予測や意思決定ツールではありません。
 
- ⚠️ **Important upfront notes**
+⚠️ **Important upfront notes**
 
- - All schools, people, and roles in this simulator are **fictional**.
- - All numbers (coefficients, thresholds, probabilities) are **illustrative levers**, not empirical truth.
- - This is **not** a decision-support tool for real HR, policy, or clinical decisions.
- - The update rules are **loosely informed by recent research** (e.g. on job demands–resources, school climate, technostress, AI in education), but only at the level of *directions* (signs), not effect sizes.
- - AI / LLM tools in this script are intentionally simplified:
-   - They relieve some workload and improve learning efficiency **only after** certain structural pre-conditions (infrastructure, repositories, clarity, trust) are met.
-   - Real-world AI deployments can also *increase* workload and stress; those “AI gone wrong” scenarios are largely **out of scope** for this toy model.
+- All schools, people, and roles in this simulator are **fictional**.
+  日本語：登場する学校・人物・役職はすべてフィクションです。
+- All numbers (coefficients, thresholds, probabilities) are **illustrative levers**, not empirical truth.
+  日本語：係数・しきい値・確率などの数値は「仮のつまみ」であり、経験的な真実ではありません。
+- This is **not** a decision-support tool for real HR, policy, or clinical decisions.
+  日本語：現実の人事・制度設計・臨床判断などの意思決定ツールとして使うことは想定していません。
+- The update rules are **loosely informed by recent research** (e.g. on job demands–resources, school climate, technostress, AI in education), but only at the level of *directions* (signs), not effect sizes.
+  日本語：更新ルールは近年の研究（仕事要求‐資源モデル、学校風土、テクノストレス、教育分野のAIなど）の「符号（方向）」のみをゆるく反映しており、効果量は反映していません。
+- AI / LLM tools in this script are intentionally simplified:
+  日本語：AI/LLM の効果は意図的に控えめで、以下の条件を満たした場合にだけ少し効くようにしています。
+  - They relieve some workload and improve learning efficiency **only after** certain structural pre-conditions (infrastructure, repositories, clarity, trust) are met.
+    日本語：インフラ・教材リポジトリ・方針の明確さ・信頼が整った後にのみ業務負荷を軽減し、学習効率を改善します。
+  - Real-world AI deployments can also *increase* workload and stress; those “AI gone wrong” scenarios are largely **out of scope** for this toy model.
+    日本語：現実のAI導入では負荷やストレスが増すケースもありますが、本モデルでは大きく扱っていません。
 
- In short: this code is a **sandbox for exploring assumptions** about structure, pressure, and different stakeholder perspectives – not a model of any specific real institution.
-
+In short: this code is a **sandbox for exploring assumptions** about structure, pressure, and different stakeholder perspectives — not a model of any specific real institution.
+日本語：これは、構造・圧力・利害関係者の視点の違いを試すための**仮想サンドボックス**であり、実在の組織を表すものではありません。
 
 ---
 
@@ -1252,3 +1260,6 @@ StakeholderUtility(
   系統的レビューでは、教員バーンアウトが学力や動機づけの質の低下と関連する一方で、どんな環境でも一部の生徒は高い成果を上げることも指摘されています（Madigan & Kim, 2021 など）。このアイデアが `student_future_hope_probability` に反映されており、悪い環境でも「小さながら 0 ではない future hope」、良い環境では「それなりの比率の future hope」が出るようになっています。
 
 数値自体は「仮のつまみ」であり、**どのつまみをどれくらい動かしたときに何が起きるかを議論するための道具**として設計されています。
+ークショップで比較しやすくなります。
+
+---
